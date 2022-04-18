@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 HERE = pathlib.Path(__file__).parent
 
-VERSION = '0.1.1'
+VERSION = '0.2.4'
 PACKAGE_NAME = 'polyhorner'
 AUTHOR = 'IDontReallyCode'
 AUTHOR_EMAIL = 'idontreallycode@outlook.com'

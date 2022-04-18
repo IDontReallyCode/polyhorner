@@ -1,1 +1,2 @@
-from .polyhorner import polyhorner
+from . import polyhorner
+# from polyhorner import horner
