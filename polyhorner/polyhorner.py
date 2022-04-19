@@ -1,15 +1,15 @@
 import numpy as np
 from numba import njit
 
+# https://people.sc.fsu.edu/~jburkardt/py_src/monomial/mono_upto_enum.py
 @njit
 def _mono_up_to(D:int,M:int):
-    # https://people.sc.fsu.edu/~jburkardt/py_src/monomial/mono_upto_enum.py
     value = _i4_choose(D+M,M)
     return value
 
+# https://people.sc.fsu.edu/~jburkardt/py_src/monomial/i4_choose.py
 @njit
 def _i4_choose(n:int,k:int):
-    # https://people.sc.fsu.edu/~jburkardt/py_src/monomial/i4_choose.py
     mn = min(k, n-k)
     mx = max(k, n-k)
 
@@ -25,24 +25,18 @@ def _i4_choose(n:int,k:int):
     return int(value)
 
 
-def _mono_unrank_grlex(m,rank):
-    # https://people.sc.fsu.edu/~jburkardt/py_src/monomial/mono_unrank_grlex.py
+# https://people.sc.fsu.edu/~jburkardt/py_src/monomial/mono_unrank_grlex.py
+@njit
+def _mono_unrank_grlex(m:int,rank:int):
 
-    #
-    #  Ensure that 1 <= M.
-    #
     if m<1:
         result = {'error':True, 'errormsg':'mono_unrank_grlex - Fatal error!   M < 1'}
-    #
-    #  Ensure that 1 <= RANK.
-    #
+
     if rank<1:
         result = {'error':True, 'errormsg':'mono_unrank_grlex - Fatal error!   rank < 1'}
 
     x = np.zeros(m,dtype=np.int32)
-    #
-    #  Special case M = 1.
-    #
+
     if m==1:
         x[0] = rank - 1
         return x
@@ -104,8 +98,10 @@ def _Dim1PolyHornerBuild(Xhere:np.array, N:int, M:int):
     # implements the simple Horner method for univariate polynomials
     X = np.ones((N,M+1))
     X[:,1] = Xhere.flatten()
-    for n in range(2,M[0]+1):
+    for n in range(2,M+1):
         X[:,n] = np.multiply(X[:,n-1], X[:,1])
+    
+    return X
 
 
 @njit
@@ -119,7 +115,6 @@ def _DimNPolyHornerBuild(Xhere, N, M, D, expo):
         for n in range(1,M[iX,0]):
             Xi[iX][:,n] = np.multiply(Xi[iX][:,n-1], Xi[iX][:,0])
 
-    # Once we have all the bases covered, let get all the possible combination, , 
     Nterms = np.size(expo,0)
 
     # We stack the columns according to the exponent recipe we have
@@ -133,6 +128,7 @@ def _DimNPolyHornerBuild(Xhere, N, M, D, expo):
     
     return X
 
+@njit
 def BuildPolynomial(D:int,M:np.ndarray):
     # Generates all exponents possible
     if isinstance(M,int):
@@ -166,7 +162,6 @@ def horner(Xin:np.array,  M:np.array, N=int(0), D=int(0), Scale=True)-> np.array
 
     # TODO, allow to simply pass the exponent matrix
 
-
     # Check Dimensions
     if (N==0) or (D==0):
         if isinstance(Xin, np.ndarray):
@@ -176,6 +171,7 @@ def horner(Xin:np.array,  M:np.array, N=int(0), D=int(0), Scale=True)-> np.array
                 # The array is one dimensional, we need to 
                 D = 1  
             N = np.size(Xin,0)
+            Xin = np.reshape(Xin,(N,D))
         else:
             HornerDict = {'error':True, 'errormsg':'Make sure you send a numpy array for your matrix of independent variables.'}
             return HornerDict
@@ -210,24 +206,21 @@ def horner(Xin:np.array,  M:np.array, N=int(0), D=int(0), Scale=True)-> np.array
         for i in range(D):
             scalingX[i,0] = np.std(Xin[:,i])
             if scalingX[i,0]==0:
-                stopheretoseewtfiswrong = 1
+                HornerDict = {'error':True, 'errormsg':'One of the X data vector is constant. Do you even know how to do a regression?'}
+                return HornerDict
             Xhere[:,i] = Xin[:,i] / scalingX[i,0]
 
     if D==1:
         # Univariate polynomials, are easy
         if M>0:
             X = _Dim1PolyHornerBuild(Xhere, N, int(M[0]))
-            # X = np.ones((N,M[0]+1))
-            # X[:,1] = Xhere.flatten()
-            # for n in range(2,M[0]+1):
-            #     X[:,n] = np.multiply(X[:,n-1], X[:,1])
             expo = np.arange(0,M[0]+1,1)
-
+            expo = np.reshape(expo,(expo.shape[0],1))
+        Nterms = X.shape[1]
     else:
         # Exponents will be a matrix
 
         # we create a list with an entry for each variable
-        # Xi = [None] * D
         maxM = int(max(M))
         Nterms = _mono_up_to(maxM, D)
         expo = BuildPolynomial(D,M)
@@ -236,30 +229,6 @@ def horner(Xin:np.array,  M:np.array, N=int(0), D=int(0), Scale=True)-> np.array
             return expo
 
         X = _DimNPolyHornerBuild(Xhere, N, M, D, expo)
-        # # We simply loop for each variables to get them to their respective power, and stack them up.
-        # # This follow Horner's method and is most efficient.
-        # for iX in range(D):
-        #     Xi[iX] = np.zeros((N,(M[iX,0])))
-        #     Xi[iX][:,0] = Xhere[:,iX]
-        #     for n in range(1,M[iX,0]):
-        #         Xi[iX][:,n] = np.multiply(Xi[iX][:,n-1], Xi[iX][:,0])
-
-        # # Once we have all the bases covered, let get all the possible combination, , 
-        # Nterms = np.size(expo,0)
-
-        # # We stack the columns according to the exponent recipe we have
-        # X = np.zeros((N,Nterms), dtype=float)
-        # for iT in range(Nterms):
-        #     ThisX = np.ones((N,D), dtype=float)
-        #     for iD in range(D):
-        #         if expo[iT,iD]>0:
-        #             ThisX[:,iD] = Xi[iD][:,expo[iT,iD]-1]
-        #     X[:,iT] = np.prod(ThisX, axis=1)
-
-        # Invert will turn a polynomial   Y = 1 + x + x^2 + x^3   into   Y = 1+ x + x^2 + x^3 + 1/x + 1/x^2 + 1/x^3
-        # if Invert:
-        #     expo = np.row_stack( (expo, -1*expo[1:,:]))
-        #     X    = np.column_stack( (X , 1/X[:,1:]))
 
 
     if Scale:
