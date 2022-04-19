@@ -10,7 +10,8 @@ AUTHOR_EMAIL = 'idontreallycode@outlook.com'
 URL = 'https://github.com/IDontReallyCode/polyhorner'
 
 LICENSE = 'MIT'
-DESCRIPTION = 'Will build univariate using an optimized Horner method and multivariate polynomial using a somewhat optimzed Horner method'
+DESCRIPTION = 'Will build univariate using an optimized Horner method and multivariate polynomial using a somewhat ' \
+              'optimized Horner method '
 LONG_DESCRIPTION = (HERE / "README.md").read_text()
 LONG_DESC_TYPE = "text/markdown"
 
