@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit
+import time
 
 # https://people.sc.fsu.edu/~jburkardt/py_src/monomial/mono_upto_enum.py
 @njit
@@ -104,7 +105,7 @@ def _Dim1PolyHornerBuild(Xhere:np.array, N:int, M:int):
     return X
 
 
-@njit
+# @njit
 def _DimNPolyHornerBuild(Xhere, N, M, D, expo):
     # We simply loop for each variables to get them to their respective power, and stack them up.
     # This follow Horner's method and is most efficient.
@@ -125,6 +126,34 @@ def _DimNPolyHornerBuild(Xhere, N, M, D, expo):
             if expo[iT,iD]>0:
                 ThisX[:,iD] = Xi[iD][:,expo[iT,iD]-1]
         X[:,iT] = np.prod(ThisX, axis=1)
+    
+    return X
+
+@njit
+def _DimNPolyHornerBuildnumba(Xhere:np.array, N:int, M:np.array, D:int, expo:np.array):
+    # We simply loop for each variables to get them to their respective power, and stack them up.
+    # This follow Horner's method and is most efficient.
+    # we need a matrix of size N*D*maxM
+    maxM = np.max(M)
+    Xi = np.zeros((N,D*maxM))
+    # each input variable will have M vectors, but we might leave some zeros in there.
+    for iX in range(D):
+        Xi[:,iX*maxM] = Xhere[:,iX]
+        for n in range(1,M[iX,0]):
+            Xi[:,iX*maxM+n] = np.multiply(Xi[:,iX*maxM+n-1], Xi[:,iX*maxM])
+
+    Nterms = expo.shape[0]
+
+    # We stack the columns according to the exponent recipe we have
+    # uns = np.ones((N,1))
+    X = np.ones((N,Nterms))
+    for iT in range(Nterms):
+        ThisX = np.ones((N,D))
+        for iD in range(D):
+            if expo[iT,iD]>0:
+                ThisX[:,iD] = Xi[:,iD*maxM+expo[iT,iD]-1]
+            X[:,iT] = np.multiply(X[:,iT],ThisX[:,iD])
+        # X[:,iT] = np.prod(ThisX, axis=1, dtype=np.float64, keepdims=False)
     
     return X
 
@@ -236,8 +265,31 @@ def horner(Xin:np.array,  M:np.array, N:int=0, D:int=0, Scale=True)-> np.array:
             # we got an error
             return expo
 
-        X = _DimNPolyHornerBuild(Xhere, N, M, D, expo)
+        # X = _DimNPolyHornerBuild(Xhere, N, M, D, expo)
+        # Xnumba = _DimNPolyHornerBuildnumba(Xhere, N, M, D, expo)
+        # ntests = 100
+        # nstats = 100
+        # regstat = np.zeros((nstats,1),dtype=float)
+        # nbastat = np.zeros((nstats,1),dtype=float)
+        # for j in range(nstats):
+        #     start = time.process_time()
+        #     for i in range(ntests):
+        #         X = _DimNPolyHornerBuild(Xhere, N, M, D, expo)
+        #     regstat[j,0] = time.process_time()-start
 
+        # for j in range(nstats):
+        #     start = time.process_time()
+        #     for i in range(ntests):
+        #         X = _DimNPolyHornerBuildnumba(Xhere, N, M, D, expo)
+        #     nbastat[j,0] = time.process_time()-start
+        
+        # print(np.mean(regstat))    0.01765625
+        # print(np.std(regstat))     0.005700448858423342
+        # print(np.mean(nbastat))    0.000625
+        # print(np.std(nbastat))     0.0030618621784789723
+        
+
+        X = _DimNPolyHornerBuildnumba(Xhere, N, M, D, expo)
 
     if Scale:
         # if Invert:
